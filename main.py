@@ -52,16 +52,9 @@ async def run(pw):
             break
 
         
-        # CAPTCHA handling: If you're expecting a CAPTCHA on the target page, use the following code snippet to check the status of Scraping Browser's automatic CAPTCHA solver
-        # client = await page.context.new_cdp_session(page)
-        # print('Waiting captcha to solve...')
-        # solve_res = await client.send('Captcha.waitForSolve', {
-        #     'detectTimeout': 10000,
-        # })
-        # print('Captcha solve status:', solve_res['status'])
+        
         print('Navigated! Scraping page content...')
-        #html = await page.content()
-        #print(html)
+        
     finally:
         await browser.close()
 

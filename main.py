@@ -2,6 +2,7 @@ import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from openai import OpenAI
+from kafka import KafkaProducer
 
 
 SBR_WS_CDP = 'wss://brd-customer-hl_ac47e1cf-zone-real_estate_browser:mnov563l1hogsq6@brd.superproxy.io:9222'
@@ -66,7 +67,7 @@ def extract_floor_plan(soup):
          
 
 
-async def run(pw):
+async def run(pw,producer):
     print('Connecting to Scraping Browser...')
     browser = await pw.chromium.connect_over_cdp(SBR_WS_CDP)
     try:
@@ -106,8 +107,9 @@ async def run(pw):
             print(data)
             break
             
-            print(data)
-
+            print("sending data to kafka...")
+            producer.send('properties', value.json.dumps(data).encode('utf-8'))
+             
 
             break
 
@@ -120,6 +122,7 @@ async def run(pw):
 
 
 async def main():
+    producer = KafkaProducer(bootstrap_servers='localhost:9092')
     async with async_playwright() as playwright:
         await run(playwright)
 

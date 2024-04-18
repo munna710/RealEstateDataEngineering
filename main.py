@@ -1,9 +1,46 @@
 import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
-SBR_WS_CDP = 'wss://brd-customer-hl_ac47e1cf-zone-real_estate_browser:v563l1hogsq6@brd.superproxy.io:9222'
+from openai import OpenAI
+
+
+SBR_WS_CDP = 'wss://brd-customer-hl_ac47e1cf-zone-real_estate_browser:mnov563l1hogsq6@brd.superproxy.io:9222'
 BASE_URL = "https://zoopla.co.uk"
 LOCATION = "London"
+
+client = OpenAI(api_key="***************************")
+
+def extract_property_details(input_command):
+    print("extracting property details...")
+     
+    command =  """
+                extract information about the apartment into json.
+                {input_command}
+                this is the final json structure expected:
+                {{
+                    "price" : "",
+                    "address" : "",
+                    "bedrooms" : "",
+                    "bathrooms" : "",
+                    "receptions" : "",
+                    "EPC_Rating" : "",
+                    "tenure": "",
+                    "time_remaining_on_lease" : "",
+                    "sevice_charge" : "",
+                    "council_tax_band" : "",
+                    "ground_rent" : ""
+
+                }}
+    """.format(input_command=input_command)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": command}
+        ]
+    )
+    res = response.choices[0].message.content
+    json_data = json.loads(res)
+    return json_data
 
 
 def extract_pictures(pictures_section):
@@ -18,6 +55,17 @@ def extract_pictures(pictures_section):
 
     return picture_sources
 
+def extract_floor_plan(soup):
+    print("Extracting floor plan")
+    plan = {}
+    floor_plan = soup.find('div',{"data-testid": "floorplan-thumbnail-0"})
+    if floor_plan:
+        floor_plan_src = floor_plan.find("picture").find("source")["srcset"]
+        plan["floor_plan"] = floor_plan_src.split(' ')[0]
+    return plan
+         
+
+
 async def run(pw):
     print('Connecting to Scraping Browser...')
     browser = await pw.chromium.connect_over_cdp(SBR_WS_CDP)
@@ -30,7 +78,7 @@ async def run(pw):
         print("waiting for search results...")
         # await page.wait_for_load_state("Load")
         await page.wait_for_load_state("networkidle")
-        content = await page.inner_html('div[data-testid="regular-listings"]')
+        content = await page.inner_html('div[data-testid="regular-listings"]',timeout=60000)
         
         soup = BeautifulSoup(content, 'html.parser')
         for idx, div in enumerate(soup.find_all('div',class_ = "dkr2t82")):
@@ -48,7 +96,19 @@ async def run(pw):
             pictures_section = soup.find("section",{"aria-labelledby":"listing-gallery-heading"})
             pictures = extract_pictures(pictures_section)
             data["pictures"] = pictures
+
+            property_details = soup.select_one('div[class="_14bi3x33z _14bi3x32f"]')
+            property_details = extract_property_details(property_details)
+            
+            floor_plan = extract_floor_plan(soup)
+            data.update(floor_plan)
+            data.update(property_details)
             print(data)
+            break
+            
+            print(data)
+
+
             break
 
         
